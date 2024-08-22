@@ -1,0 +1,403 @@
+---
+title: "Emotions in social media"
+author: "Marc Cervera Rosell"
+date: "2024-08-15"
+output: pdf_document
+---
+
+# 1. Load dataset
+
+[Dataset link]{<https://www.kaggle.com/code/saadatkhalid/social-media-vs-emotions-eda-model-99-acc/input?select=train.csv>}
+
+```{r}
+tryCatch({
+  data <- read.csv("train.csv", header = TRUE)
+  print("File read successfully")
+}, error = function(e) {
+  cat("ERROR when loading the dataset",conditionMessage(e), "\n")
+})
+```
+
+
+# 2. Preprocessing data
+
+## 2.1 Delete blank lines (if needed):
+
+```{r}
+cat("Rows before:", nrow(data), "\n")
+data <- data[rowSums(is.na(data) | data == "") != ncol(data), ]
+cat("Rows after:", nrow(data))
+```
+
+## 2.2 Check variable types and column names
+
+```{r}
+columns <- names(data)
+types <- sapply(data, class)
+for (i in seq_along(columns)) {
+  cat("Column name:", columns[i], " Type:", types[i], "\n")
+}
+```
+
+Transformations:
+
+- Column "Age" will become an integer
+
+- Column "Daily_Usage_Time..minutes" will be renamed as "Minutes_Per_Day"
+
+```{r}
+data_transformed <- transform(data,
+                              Age = as.integer(Age))
+colnames(data_transformed)[colnames(data_transformed) == "Daily_Usage_Time..minutes."] <- "Minutes_Per_Day"
+```
+
+```{r}
+types <- sapply(data_transformed, class)
+for (i in seq_along(columns)) {
+  cat("Column name:", columns[i], " Type:", types[i], "\n")
+}
+```
+
+## 2.3 Check if there's NA values
+
+```{r}
+any(is.na(data_transformed))
+```
+
+
+# 3. Descriptive analysis and inferential
+
+# 3.1 Data distribution per gender, platform, age and dominant emotion
+
+### 3.1.1 Data distribution per gender
+
+```{r}
+genders <- unique(data_transformed$Gender)
+print(genders)
+```
+
+```{r}
+percentages_gender <- round(prop.table(table(data_transformed$Gender)) * 100, 2)
+for (i in seq_along(genders)) {
+  cat("Gender:",  genders[i], "- Percentage:", percentages_gender[i],"%\n")
+}
+```
+
+```{r}
+pie(table(data_transformed$Gender), main = "Distribution per age",
+    col = rainbow(length(unique(data_transformed$Gender))))
+    labels = genders
+```
+
+### 3.1.2 Data distribution per platform
+
+```{r}
+platforms <- unique(data_transformed$Platform)
+print(platforms)
+```
+
+```{r}
+percentages_platform <- round(prop.table(table(data_transformed$Platform)) * 100, 2)
+for (i in seq_along(platforms)) {
+  cat("Gender:",  platforms[i], "- Percentage:", percentages_platform[i],"%\n")
+}
+```
+
+```{r}
+pie(table(data_transformed$Platform), main = "Distribution per platform",
+    col = rainbow(length(unique(data_transformed$Platform))))
+    labels = platforms
+```
+
+## 3.1.3 Data distribution per age
+
+```{r}
+ages <- unique(data_transformed$Age)
+print(ages)
+```
+
+```{r}
+percentages_ages <- round(prop.table(table(data_transformed$Age)) * 100, 2)
+for (i in seq_along(ages)) {
+  cat("Gender:",  ages[i], "- Percentage:", percentages_ages[i],"%\n")
+}
+```
+
+```{r}
+pie(table(data_transformed$Age), main = "Distribution per age",
+    col = rainbow(length(unique(data_transformed$Age))))
+    labels = ages
+```
+
+## 3.1.3 Data distribution per dominant emotion
+
+```{r}
+emotions <- unique(data_transformed$Dominant_Emotion)
+print(emotions)
+```
+
+```{r}
+percentages_emotions <- round(prop.table(table(data_transformed$Dominant_Emotion)) * 100, 2)
+for (i in seq_along(emotions)) {
+  cat("Gender:",  emotions[i], "- Percentage:", percentages_emotions[i],"%\n")
+}
+```
+
+```{r}
+pie(table(data_transformed$Dominant_Emotion), main = "Distribution per dominant emotion",
+    col = rainbow(length(unique(data_transformed$Dominant_Emotion))))
+    labels = emotions
+```
+
+## 3.2 Check if there are extreme ages
+
+```{r}
+boxplot(data_transformed$Age, main = "Boxplot of ages",
+        ylab = "Ages")
+```
+
+```{r}
+cat("Median: ",median(data_transformed$Age),"\n")
+cat("Quantiles 25%, 50%, 75%: ",quantile(data_transformed$Age, probs = c(0.25, 0.5, 0.75)))
+```
+
+Median line -> Closer to Q3 (not too much) -> More people has less than 27 YO.
+
+Box -> Q1 = 24 and Q3 = 30.25 ~ 30 -> 50% of the people has between 24 and 30 YO.
+
+Whiskers -> Top whisker is longer than bottom whisker -> Ages above median are more dispersed
+
+Outliers -> There are no outliers
+
+## 3.3 Relation between used platform and dominant emotion
+
+H0 -> There's no significant association between both variables
+
+H1 -> There's significant association between both variables
+
+```{r}
+chisq_data <- table(data_transformed$Platform, data_transformed$Dominant_Emotion)
+chisq_data
+```
+
+```{r}
+# Alpha = 0.05 -> CL = 95%
+chisq.test(chisq_data, correct = FALSE)
+```
+
+The p value < 0.05(alpha) -> There's enough evidence to refuse H0 with a 95% confidence level
+
+## 3.4 Relation between minutes per day and dominant emotion
+
+H0 -> The spent time on social media is the same regardless of the dominant emotion
+
+H1 -> At least one emotion spends more/less time on social media
+
+```{r}
+plot(density(data_transformed$Minutes_Per_Day),
+     main = "Minutes dedicated to social media per day",
+     xlab = "Minutes",
+     ylab = "Density",
+     col = "blue",
+     lwd = 2)
+values_normal_distribution <- seq(min(data_transformed$Minutes_Per_Day), max(data_transformed$Minutes_Per_Day),
+                                  length = 100)
+normal_distribution <- dnorm(values_normal_distribution, mean = abs(mean(data_transformed$Minutes_Per_Day)),
+                             sd = sd(data_transformed$Minutes_Per_Day))
+lines(values_normal_distribution, normal_distribution, col = "red", lwd = 2)
+```
+
+Variable Minutes_Per_Day -> No normal distribution -> ANOVA no possible
+
+```{r}
+kruskal <- kruskal.test(Minutes_Per_Day ~ Dominant_Emotion, data = data_transformed)
+kruskal
+```
+
+p < 0.05 -> There's enough evidence to refuse H0 with a 95% confidence level -> Suggests relation
+
+```{r}
+library(dunn.test)
+```
+
+```{r}
+results_dunn <- dunn.test(data_transformed$Minutes_Per_Day, data_transformed$Dominant_Emotion, method = "bonferroni")
+print(results_dunn)
+```
+
+Significant difference = Between both emotions, one of them spends more/less time on social media than the other emotion.
+
+Considering significance = 0.05 -> CL = 95%:
+  - "Anger - Boredom"
+  - "Anxiety - Boredom"
+  - "Anger - Happiness" 
+  - "Anxiety - Happiness"
+  - "Boredom - Happiness"
+  - "Anger - Neutral"
+  - "Anxiety - Neutral"
+  - "Boredom - Neutral"
+  - "Happiness - Neutral"
+  - "Anger - Sadness"
+
+```{r}
+library(ggplot2)
+library(dplyr)
+```
+
+
+```{r}
+ggplot(data_transformed, aes(x = Dominant_Emotion, y = Minutes_Per_Day)) +
+  geom_violin() +
+  scale_y_continuous(limits = c(0, 200),
+                     breaks = seq(0, 200, by = 20)) +
+  labs(title = "Distribution of the minutes dedicated to social media per dominant emotion",
+       x = "Dominant emotion",
+       y = "Minutes per day")
+```
+
+Taking a look at the graphic above, H1 is confirmed.
+
+```{r}
+minutes_platform <- data_transformed %>%
+  group_by(Platform) %>%
+  summarise(suma = sum(Minutes_Per_Day)) %>%
+  arrange(desc(suma))
+print(minutes_platform)
+```
+
+## 3.5 Relation between posts per day and dominant emotion
+
+H0 -> The daily posts are the same regardless of the dominant emotion
+
+H1 -> At least one emotion has more/less daily posts
+
+```{r}
+plot(density(data_transformed$Posts_Per_Day),
+     main = "Posts per day on social media per day",
+     xlab = "Posts",
+     ylab = "Density",
+     col = "blue",
+     lwd = 2)
+values_normal_distribution <- seq(min(data_transformed$Posts_Per_Day), max(data_transformed$Posts_Per_Day),
+                                  length = 100)
+normal_distribution <- dnorm(values_normal_distribution, mean = abs(mean(data_transformed$Posts_Per_Day)),
+                             sd = sd(data_transformed$Posts_Per_Day))
+lines(values_normal_distribution, normal_distribution, col = "red", lwd = 2)
+```
+
+Variable Posts_Per_Day -> No normal distribution -> ANOVA no possible
+
+```{r}
+kruskal <- kruskal.test(Posts_Per_Day ~ Dominant_Emotion, data = data_transformed)
+kruskal
+```
+
+p < 0.05 -> There's enough evidence to refuse H0 with a 95% confidence level -> Suggests relation
+
+```{r}
+results_dunn <- dunn.test(data_transformed$Posts_Per_Day, data_transformed$Dominant_Emotion, method = "bonferroni")
+print(results_dunn)
+```
+
+Significant difference = Between both emotions, one of them posts more/less on social media than the other emotion.
+
+Considering significance = 0.05 -> CL = 95%:
+  - "Anger - Anxiety"
+  - "Anger - Boredom"
+  - "Anxiety - Boredom"
+  - "Anger - Happiness"
+  - "Anxiety - Happiness"
+  - "Boredom - Happiness"
+  - "Anger - Neutral"
+  - "Anxiety - Neutral"
+  - "Boredom - Neutral"
+  - "Happiness - Neutral"
+  - "Anger - Sadness" 
+  - "Boredom - Sadness"
+  - "Happiness - Sadness"
+  - "Neutral - Sadness"  
+  
+```{r}
+ggplot(data_transformed, aes(x = Dominant_Emotion, y = Posts_Per_Day)) +
+  geom_violin() +
+  scale_y_continuous(limits = c(0, 9),
+                     breaks = seq(0, 9, by = 1)) +
+  labs(title = "Distribution of the posts per day on social media per dominant emotion",
+       x = "Dominant emotion",
+       y = "Posts per day")
+```
+  
+Taking a look at the graphic above, H1 is confirmed.
+
+```{r}
+posts_platform <- data_transformed %>%
+  group_by(Platform) %>%
+  summarise(suma = sum(Posts_Per_Day)) %>%
+  arrange(desc(suma))
+print(posts_platform)
+```  
+  
+  
+## 3.6 Relation between likes received per day and dominant emotion
+
+H0 -> The likes received are the same regardless of the dominant emotion
+
+H1 -> At least one emotion has more/less likes
+
+```{r}
+plot(density(data_transformed$Likes_Received_Per_Day),
+     main = "Likes per day on social media per day",
+     xlab = "Likes",
+     ylab = "Density",
+     col = "blue",
+     lwd = 2)
+values_normal_distribution <- seq(min(data_transformed$Likes_Received_Per_Day), max(data_transformed$Likes_Received_Per_Day),
+                                  length = 100)
+normal_distribution <- dnorm(values_normal_distribution, mean = abs(mean(data_transformed$Likes_Received_Per_Day)),
+                             sd = sd(data_transformed$Likes_Received_Per_Day))
+lines(values_normal_distribution, normal_distribution, col = "red", lwd = 2)
+```
+  
+Variable Likes_Received_Per_Day -> No normal distribution -> ANOVA no possible
+
+```{r}
+kruskal <- kruskal.test(Likes_Received_Per_Day ~ Dominant_Emotion, data = data_transformed)
+kruskal
+```
+
+p < 0.05 -> There's enough evidence to refuse H0 with a 95% confidence level -> Suggests relation
+
+```{r}
+ggplot(data_transformed, aes(x = Dominant_Emotion, y = Likes_Received_Per_Day)) +
+  geom_violin() +
+    scale_y_continuous(limits = c(0, 120),
+                     breaks = seq(0, 120, by = 10)) +
+  labs(title = "Distribution of the likes received per day on social media per dominant emotion",
+       x = "Dominant emotion",
+       y = "Likes per day")
+```
+  
+Taking a look at the graphic above, H1 is confirmed.
+ 
+```{r}
+likes_platform <- data_transformed %>%
+  group_by(Platform) %>%
+  summarise(suma = sum(Likes_Received_Per_Day)) %>%
+  arrange(desc(suma))
+print(likes_platform)
+```  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+
+
+
+
+
