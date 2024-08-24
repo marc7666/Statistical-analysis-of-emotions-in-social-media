@@ -167,7 +167,7 @@ Median line -> Closer to Q3 (not too much) -> More people has less than 27 YO.
 
 Box -> Q1 = 24 and Q3 = 30.25 ~ 30 -> 50% of the people has between 24 and 30 YO.
 
-Whiskers -> Top whisker is longer than bottom whisker -> Ages above median are more dispersed
+Whiskers -> Top whisker is longer than bottom whisker -> Ages above median are more dispersed (More difference between the median and the max value)
 
 Outliers -> There are no outliers
 
@@ -686,28 +686,43 @@ ggplot(data_transformed, aes(x = Dominant_Emotion, y = Age)) +
 
 Taking a look at the graphic above, H1 is confirmed.
 
+# 4. Random forest prediction
 
+```{r}
+library(randomForest)
+library(caret)
+```
 
+```{r}
+set.seed(123)
+index <- sample(1:nrow(data_transformed), 0.8 * nrow(data_transformed))
+training_data <- data_transformed[index, ]
+test_data <- data_transformed[-index, ]
+```
 
+```{r}
+control <- trainControl(method = "repeatedcv", number = 10, repeats = 3,
+                        search = "random")
+model_random_forest <- train(Dominant_Emotion ~ Gender + Age + Platform +
+                                      Minutes_Per_Day + Posts_Per_Day + 
+                                      Likes_Received_Per_Day + 
+                                      Comments_Received_Per_Day + 
+                                      Messages_Sent_Per_Day,
+                             data = training_data,
+                             method = "rf",
+                             metric = "Accuracy",
+                             tuneLength = 13,
+                             trControl = control)
+print(model_random_forest)
+```
 
+```{r}
+predictions <- predict(model_random_forest, test_data)
+confusionMatrix(as.factor(predictions), as.factor(test_data$Dominant_Emotion))
+```
 
+Test data accuracy is 97.5%
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+```{r}
+plot(model_random_forest)
+```
